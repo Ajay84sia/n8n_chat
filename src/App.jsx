@@ -393,7 +393,7 @@ function App() {
 
     if (!N8N_CHAT_URL) {
       console.error(
-        "VITE_N8N_CHAT_URL is not configured."
+        "CHAT_URL is not configured."
       );
 
       return;
