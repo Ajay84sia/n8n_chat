@@ -67,8 +67,7 @@ function formatChatDate(timestamp) {
 function CodeBlock({ children, className }) {
   const [copied, setCopied] = useState(false);
 
-  const language =
-    className?.replace("language-", "") || "text";
+  const language = className?.replace("language-", "") || "text";
 
   const code = String(children).replace(/\n$/, "");
 
@@ -88,9 +87,7 @@ function CodeBlock({ children, className }) {
   return (
     <div className="group relative my-4 overflow-hidden rounded-xl border border-white/10">
       <div className="flex items-center justify-between bg-black/40 px-4 py-2">
-        <span className="text-xs text-slate-400">
-          {language}
-        </span>
+        <span className="text-xs text-slate-400">{language}</span>
 
         <button
           onClick={copyCode}
@@ -133,11 +130,7 @@ function MarkdownMessage({ content }) {
               );
             }
 
-            return (
-              <CodeBlock className={className}>
-                {children}
-              </CodeBlock>
-            );
+            return <CodeBlock className={className}>{children}</CodeBlock>;
           },
 
           a({ children, href }) {
@@ -155,50 +148,32 @@ function MarkdownMessage({ content }) {
 
           ul({ children }) {
             return (
-              <ul className="my-3 list-disc space-y-1 pl-6">
-                {children}
-              </ul>
+              <ul className="my-3 list-disc space-y-1 pl-6">{children}</ul>
             );
           },
 
           ol({ children }) {
             return (
-              <ol className="my-3 list-decimal space-y-1 pl-6">
-                {children}
-              </ol>
+              <ol className="my-3 list-decimal space-y-1 pl-6">{children}</ol>
             );
           },
 
           h1({ children }) {
-            return (
-              <h1 className="mb-3 mt-5 text-2xl font-bold">
-                {children}
-              </h1>
-            );
+            return <h1 className="mb-3 mt-5 text-2xl font-bold">{children}</h1>;
           },
 
           h2({ children }) {
-            return (
-              <h2 className="mb-3 mt-5 text-xl font-bold">
-                {children}
-              </h2>
-            );
+            return <h2 className="mb-3 mt-5 text-xl font-bold">{children}</h2>;
           },
 
           h3({ children }) {
             return (
-              <h3 className="mb-2 mt-4 text-lg font-semibold">
-                {children}
-              </h3>
+              <h3 className="mb-2 mt-4 text-lg font-semibold">{children}</h3>
             );
           },
 
           p({ children }) {
-            return (
-              <p className="mb-3 last:mb-0">
-                {children}
-              </p>
-            );
+            return <p className="mb-3 last:mb-0">{children}</p>;
           },
 
           blockquote({ children }) {
@@ -229,9 +204,7 @@ function MarkdownMessage({ content }) {
 
           td({ children }) {
             return (
-              <td className="border border-white/10 px-3 py-2">
-                {children}
-              </td>
+              <td className="border border-white/10 px-3 py-2">{children}</td>
             );
           },
         }}
@@ -298,7 +271,7 @@ function App() {
         }
       }
     } catch {
-      // Ignore storage errors
+      return null;
     }
 
     return null;
@@ -313,15 +286,10 @@ function App() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const activeChat =
-    chats.find((chat) => chat.id === activeChatId) ||
-    chats[0];
+  const activeChat = chats.find((chat) => chat.id === activeChatId) || chats[0];
 
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(chats)
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
   }, [chats]);
 
   useEffect(() => {
@@ -342,11 +310,7 @@ function App() {
 
   const updateChat = (chatId, updater) => {
     setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === chatId
-          ? updater(chat)
-          : chat
-      )
+      prev.map((chat) => (chat.id === chatId ? updater(chat) : chat)),
     );
   };
 
@@ -368,9 +332,7 @@ function App() {
       return;
     }
 
-    const remaining = chats.filter(
-      (chat) => chat.id !== chatId
-    );
+    const remaining = chats.filter((chat) => chat.id !== chatId);
 
     setChats(remaining);
 
@@ -384,6 +346,21 @@ function App() {
     setSidebarOpen(false);
   };
 
+  const addAssistantMessage = (chatId, content) => {
+    const assistantMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: String(content),
+      timestamp: Date.now(),
+    };
+
+    updateChat(chatId, (chat) => ({
+      ...chat,
+      messages: [...chat.messages, assistantMessage],
+      updatedAt: Date.now(),
+    }));
+  };
+
   const sendMessage = async (quickMessage = null) => {
     const text = (quickMessage || message).trim();
 
@@ -392,8 +369,11 @@ function App() {
     }
 
     if (!N8N_CHAT_URL) {
-      console.error(
-        "CHAT_URL is not configured."
+      console.error("VITE_N8N_CHAT_URL is not configured.");
+
+      addAssistantMessage(
+        activeChat.id,
+        "n8n chat URL is not configured. Please check your `.env` file.",
       );
 
       return;
@@ -410,10 +390,7 @@ function App() {
 
     updateChat(activeChat.id, (chat) => ({
       ...chat,
-      title:
-        chat.messages.length === 0
-          ? text.slice(0, 40)
-          : chat.title,
+      title: chat.messages.length === 0 ? text.slice(0, 40) : chat.title,
       messages: [...chat.messages, userMessage],
       updatedAt: now,
     }));
@@ -436,184 +413,34 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `HTTP ${response.status}`
-        );
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const contentType =
-        response.headers.get("content-type") || "";
+      const data = await response.json();
 
-      /*
-       * Streaming response.
-       *
-       * If n8n returns text/event-stream, process
-       * the response progressively.
-       */
+      console.log("n8n response:", data);
+
+      const aiResponse = data.chatOutput;
+
       if (
-        contentType.includes("text/event-stream") &&
-        response.body
+        aiResponse === undefined ||
+        aiResponse === null ||
+        String(aiResponse).trim() === ""
       ) {
-        await handleStreamingResponse(
-          response,
-          activeChat.id
-        );
-      } else {
-        const data = await response.json();
-
-        const aiResponse =
-          data["CHAT DATA"] ??
-          data.output ??
-          data.text ??
-          data.response ??
-          "No response received from n8n.";
-
-        addAssistantMessage(
-          activeChat.id,
-          aiResponse
-        );
+        throw new Error("n8n response does not contain chatOutput.");
       }
+
+      addAssistantMessage(activeChat.id, aiResponse);
     } catch (error) {
       console.error("n8n error:", error);
 
       addAssistantMessage(
         activeChat.id,
-        "Sorry, I couldn't connect to the AI assistant. Please try again."
+        "Sorry, I couldn't connect to the AI assistant. Please try again.",
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  const addAssistantMessage = (
-    chatId,
-    content
-  ) => {
-    const assistantMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content,
-      timestamp: Date.now(),
-    };
-
-    updateChat(chatId, (chat) => ({
-      ...chat,
-      messages: [
-        ...chat.messages,
-        assistantMessage,
-      ],
-      updatedAt: Date.now(),
-    }));
-  };
-
-  const handleStreamingResponse = async (
-    response,
-    chatId
-  ) => {
-    const reader =
-      response.body.getReader();
-
-    const decoder = new TextDecoder();
-
-    let assistantText = "";
-
-    const assistantId = crypto.randomUUID();
-
-    updateChat(chatId, (chat) => ({
-      ...chat,
-      messages: [
-        ...chat.messages,
-        {
-          id: assistantId,
-          role: "assistant",
-          content: "",
-          timestamp: Date.now(),
-          streaming: true,
-        },
-      ],
-      updatedAt: Date.now(),
-    }));
-
-    let buffer = "";
-
-    while (true) {
-      const { value, done } =
-        await reader.read();
-
-      if (done) break;
-
-      buffer += decoder.decode(value, {
-        stream: true,
-      });
-
-      const lines = buffer.split("\n");
-
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-
-        if (!trimmed) continue;
-
-        let chunk = trimmed;
-
-        if (trimmed.startsWith("data:")) {
-          chunk = trimmed
-            .replace(/^data:\s*/, "")
-            .trim();
-        }
-
-        if (chunk === "[DONE]") {
-          continue;
-        }
-
-        try {
-          const parsed = JSON.parse(chunk);
-
-          chunk =
-            parsed["CHAT DATA"] ??
-            parsed.output ??
-            parsed.text ??
-            parsed.response ??
-            parsed.content ??
-            parsed.message ??
-            "";
-        } catch {
-          // Plain text chunk
-        }
-
-        if (!chunk) continue;
-
-        assistantText += chunk;
-
-        updateChat(chatId, (chat) => ({
-          ...chat,
-          messages: chat.messages.map(
-            (msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    content: assistantText,
-                  }
-                : msg
-          ),
-          updatedAt: Date.now(),
-        }));
-      }
-    }
-
-    updateChat(chatId, (chat) => ({
-      ...chat,
-      messages: chat.messages.map(
-        (msg) =>
-          msg.id === assistantId
-            ? {
-                ...msg,
-                streaming: false,
-              }
-            : msg
-      ),
-    }));
   };
 
   const themeClasses = darkMode
@@ -629,18 +456,12 @@ function App() {
     : "border-slate-200 bg-white/90";
 
   return (
-    <div
-      className={`relative flex h-[100dvh] overflow-hidden ${themeClasses}`}
-    >
-      {/* Background glow */}
-
+    <div className={`relative flex h-[100dvh] overflow-hidden ${themeClasses}`}>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl" />
 
         <div className="absolute -bottom-32 right-0 h-96 w-96 rounded-full bg-purple-600/10 blur-3xl" />
       </div>
-
-      {/* Mobile overlay */}
 
       {sidebarOpen && (
         <button
@@ -649,8 +470,6 @@ function App() {
           className="fixed inset-0 z-30 bg-black/60 lg:hidden"
         />
       )}
-
-      {/* Sidebar */}
 
       <aside
         className={`
@@ -661,15 +480,9 @@ function App() {
           shadow-2xl
           transition-transform duration-300
           lg:relative lg:z-20 lg:translate-x-0
-          ${
-            sidebarOpen
-              ? "translate-x-0"
-              : "-translate-x-full"
-          }
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Brand */}
-
         <div className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20">
@@ -677,9 +490,7 @@ function App() {
             </div>
 
             <div>
-              <h1 className="text-lg font-bold">
-                MindFlow AI
-              </h1>
+              <h1 className="text-lg font-bold">MindFlow AI</h1>
 
               <p className="text-xs text-slate-400">
                 Your intelligent assistant
@@ -688,16 +499,12 @@ function App() {
           </div>
 
           <button
-            onClick={() =>
-              setSidebarOpen(false)
-            }
+            onClick={() => setSidebarOpen(false)}
             className="rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden"
           >
             <FiX />
           </button>
         </div>
-
-        {/* New Chat */}
 
         <div className="px-4">
           <button
@@ -709,8 +516,6 @@ function App() {
           </button>
         </div>
 
-        {/* History */}
-
         <div className="mt-6 flex-1 overflow-y-auto px-3">
           <div className="mb-2 flex items-center justify-between px-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -721,11 +526,8 @@ function App() {
           </div>
 
           <div className="space-y-1">
-            {chats
-              .sort(
-                (a, b) =>
-                  b.updatedAt - a.updatedAt
-              )
+            {[...chats]
+              .sort((a, b) => b.updatedAt - a.updatedAt)
               .map((chat) => (
                 <div
                   key={chat.id}
@@ -743,26 +545,18 @@ function App() {
                   `}
                 >
                   <button
-                    onClick={() =>
-                      selectChat(chat.id)
-                    }
+                    onClick={() => selectChat(chat.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <p className="truncate text-sm font-medium">
-                      {chat.title}
-                    </p>
+                    <p className="truncate text-sm font-medium">{chat.title}</p>
 
                     <p className="mt-1 text-xs text-slate-500">
-                      {formatChatDate(
-                        chat.updatedAt
-                      )}
+                      {formatChatDate(chat.updatedAt)}
                     </p>
                   </button>
 
                   <button
-                    onClick={() =>
-                      deleteChat(chat.id)
-                    }
+                    onClick={() => deleteChat(chat.id)}
                     className="rounded-lg p-2 text-slate-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
                     title="Delete chat"
                   >
@@ -773,18 +567,12 @@ function App() {
           </div>
         </div>
 
-        {/* Bottom */}
-
         <div className="border-t border-white/10 p-4">
           <button className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-white/5">
             <FiSettings className="text-slate-400" />
 
-            <span className="text-sm">
-              Settings
-            </span>
+            <span className="text-sm">Settings</span>
           </button>
-
-          {/* Profile */}
 
           <div className="relative mt-2">
             {profileOpen && (
@@ -813,9 +601,7 @@ function App() {
             )}
 
             <button
-              onClick={() =>
-                setProfileOpen(!profileOpen)
-              }
+              onClick={() => setProfileOpen(!profileOpen)}
               className="flex w-full items-center gap-3 rounded-xl border border-white/10 p-3 transition hover:bg-white/5"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-semibold">
@@ -823,9 +609,7 @@ function App() {
               </div>
 
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-medium">
-                  Ajay Chaurasia
-                </p>
+                <p className="truncate text-sm font-medium">Ajay Chaurasia</p>
 
                 <div className="flex items-center gap-1 text-xs text-emerald-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -839,11 +623,7 @@ function App() {
         </div>
       </aside>
 
-      {/* Main */}
-
       <section className="relative flex min-w-0 flex-1 flex-col">
-        {/* Header */}
-
         <header
           className={`
             relative z-10 flex h-[72px] shrink-0
@@ -854,9 +634,7 @@ function App() {
         >
           <div className="flex items-center gap-3">
             <button
-              onClick={() =>
-                setSidebarOpen(true)
-              }
+              onClick={() => setSidebarOpen(true)}
               className="rounded-xl p-2 hover:bg-white/10 lg:hidden"
             >
               <FiMenu size={22} />
@@ -864,33 +642,20 @@ function App() {
 
             <div>
               <h2 className="font-semibold">
-                {activeChat?.title ||
-                  "New conversation"}
+                {activeChat?.title || "New conversation"}
               </h2>
 
-              <p className="text-xs text-slate-500">
-                Powered by n8n
-              </p>
+              <p className="text-xs text-slate-500">Powered by n8n</p>
             </div>
           </div>
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() =>
-                setDarkMode(!darkMode)
-              }
-              title={
-                darkMode
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"
-              }
+              onClick={() => setDarkMode(!darkMode)}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
               className="rounded-xl p-3 transition hover:bg-white/10"
             >
-              {darkMode ? (
-                <FiSun size={19} />
-              ) : (
-                <FiMoon size={19} />
-              )}
+              {darkMode ? <FiSun size={19} /> : <FiMoon size={19} />}
             </button>
 
             <button className="hidden rounded-xl p-3 transition hover:bg-white/10 sm:block">
@@ -898,8 +663,6 @@ function App() {
             </button>
           </div>
         </header>
-
-        {/* Messages */}
 
         <main className="flex-1 overflow-y-auto px-3 py-6 sm:px-6">
           <div className="mx-auto max-w-4xl">
@@ -914,9 +677,8 @@ function App() {
                 </h2>
 
                 <p className="mt-3 max-w-md text-sm text-slate-500 sm:text-base">
-                  Ask me anything. I can help you
-                  brainstorm, learn, write, analyze,
-                  and much more.
+                  Ask me anything. I can help you brainstorm, learn, write,
+                  analyze, and much more.
                 </p>
 
                 <div className="mt-8 flex flex-wrap justify-center gap-2">
@@ -927,14 +689,7 @@ function App() {
                   ].map((item) => (
                     <button
                       key={item}
-                      onClick={() =>
-                        sendMessage(
-                          item.replace(
-                            / [^\x00-\x7F]/g,
-                            ""
-                          )
-                        )
-                      }
+                      onClick={() => sendMessage(item)}
                       className={`
                         rounded-xl border px-4 py-2.5
                         text-sm transition
@@ -951,117 +706,87 @@ function App() {
             )}
 
             <div className="space-y-7">
-              {activeChat?.messages.map(
-                (msg) => (
+              {activeChat?.messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`group flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
                   <div
-                    key={msg.id}
-                    className={`group flex ${
-                      msg.role === "user"
-                        ? "justify-end"
-                        : "justify-start"
+                    className={`flex max-w-[92%] gap-3 sm:max-w-[80%] ${
+                      msg.role === "user" ? "flex-row-reverse" : "flex-row"
                     }`}
                   >
-                    <div
-                      className={`flex max-w-[92%] gap-3 sm:max-w-[80%] ${
-                        msg.role === "user"
-                          ? "flex-row-reverse"
-                          : "flex-row"
-                      }`}
-                    >
-                      {msg.role ===
-                        "assistant" && (
-                        <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 sm:flex">
-                          <BsRobot size={15} />
-                        </div>
-                      )}
+                    {msg.role === "assistant" && (
+                      <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 sm:flex">
+                        <BsRobot size={15} />
+                      </div>
+                    )}
 
-                      <div>
-                        <div
-                          className={`
+                    <div>
+                      <div
+                        className={`
                             rounded-2xl px-4 py-3
                             shadow-lg
                             ${
-                              msg.role ===
-                              "user"
+                              msg.role === "user"
                                 ? "rounded-br-md bg-gradient-to-r from-blue-600 to-purple-600"
                                 : darkMode
-                                ? "rounded-bl-md border border-white/10 bg-white/[0.06] backdrop-blur-xl"
-                                : "rounded-bl-md border border-slate-200 bg-white shadow-sm"
+                                  ? "rounded-bl-md border border-white/10 bg-white/[0.06] backdrop-blur-xl"
+                                  : "rounded-bl-md border border-slate-200 bg-white shadow-sm"
                             }
                           `}
-                        >
-                          {msg.role ===
-                          "assistant" ? (
-                            <MarkdownMessage
-                              content={
-                                msg.content
-                              }
-                            />
-                          ) : (
-                            <p className="whitespace-pre-wrap text-sm leading-6">
-                              {msg.content}
-                            </p>
-                          )}
-                        </div>
-
-                        <div
-                          className={`mt-1 flex items-center gap-2 text-[10px] text-slate-500 ${
-                            msg.role === "user"
-                              ? "justify-end"
-                              : "justify-start"
-                          }`}
-                        >
-                          {formatTime(
-                            msg.timestamp
-                          )}
-
-                          {msg.role ===
-                            "user" && (
-                            <span>✓✓</span>
-                          )}
-                        </div>
-
-                        {msg.role ===
-                          "assistant" &&
-                          !msg.streaming && (
-                            <MessageActions
-                              content={
-                                msg.content
-                              }
-                            />
-                          )}
+                      >
+                        {msg.role === "assistant" ? (
+                          <MarkdownMessage content={msg.content} />
+                        ) : (
+                          <p className="whitespace-pre-wrap text-sm leading-6">
+                            {msg.content}
+                          </p>
+                        )}
                       </div>
+
+                      <div
+                        className={`mt-1 flex items-center gap-2 text-[10px] text-slate-500 ${
+                          msg.role === "user" ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        {formatTime(msg.timestamp)}
+
+                        {msg.role === "user" && <span>✓✓</span>}
+                      </div>
+
+                      {msg.role === "assistant" && (
+                        <MessageActions content={msg.content} />
+                      )}
                     </div>
                   </div>
-                )
+                </div>
+              ))}
+
+              {loading && (
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
+                    <BsRobot size={15} />
+                  </div>
+
+                  <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-xl">
+                    <div className="flex gap-1.5">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400" />
+
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-purple-400 [animation-delay:150ms]" />
+
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400 [animation-delay:300ms]" />
+                    </div>
+                  </div>
+                </div>
               )}
-
-              {loading &&
-                !activeChat?.messages.some(
-                  (msg) =>
-                    msg.streaming
-                ) && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
-                      <BsRobot size={15} />
-                    </div>
-
-                    <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-xl">
-                      <div className="flex gap-1.5">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-purple-400 [animation-delay:150ms]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400 [animation-delay:300ms]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
               <div ref={messagesEndRef} />
             </div>
           </div>
         </main>
-
-        {/* Composer */}
 
         <footer
           className={`
@@ -1082,16 +807,9 @@ function App() {
                 value={message}
                 disabled={loading}
                 rows={1}
-                onChange={(e) =>
-                  setMessage(
-                    e.target.value
-                  )
-                }
+                onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey
-                  ) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     sendMessage();
                   }
@@ -1101,13 +819,8 @@ function App() {
               />
 
               <button
-                onClick={() =>
-                  sendMessage()
-                }
-                disabled={
-                  !message.trim() ||
-                  loading
-                }
+                onClick={() => sendMessage()}
+                disabled={!message.trim() || loading}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-600/20 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
               >
                 <FiSend size={18} />
@@ -1115,8 +828,7 @@ function App() {
             </div>
 
             <p className="mt-2 text-center text-[10px] text-slate-500 sm:text-xs">
-              MindFlow AI can make mistakes.
-              Consider checking important
+              MindFlow AI can make mistakes. Consider checking important
               information.
             </p>
           </div>
